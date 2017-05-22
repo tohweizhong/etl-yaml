@@ -1,0 +1,276 @@
+# Transforming LDR to LBS format for Globe Telecom
+# author: Ridho Akhiro
+# 20161013
+
+# application name
+name: ds_ldr_transformation_globe
+
+# input arguments
+arguments:
+    - !argument
+        name: input_path
+        description: LDR input path
+        required: true
+
+    - !argument
+        name: output_path
+        description: output path
+        required: true
+
+    - !argument
+        name: cgi_mapping_table_path
+        description: cell mapping file path
+        required: true
+
+# data source
+source:
+    # direct historical data from HDFS
+    !!com.dataspark.sources.TextFileSource
+        uri: !arg input_path
+
+# jobs before main processing
+pre:
+    # load cell mapping table and set cgi as key
+    !!com.dataspark.jobs.inputs.FileCacheJob
+        uri: !arg cgi_mapping_table_path
+        name: cell_mapping_table
+        multiLined: true
+        keyField: cgi
+        decoder: !!com.dataspark.codecs.DelimitedRecordStringDecoder
+            delimiter: ','
+            inner: !!com.dataspark.codecs.MapDecoder
+                fields:
+                    - !!com.dataspark.codecs.Field
+                        name: lac
+                        index: 4
+                        decoder: !!com.dataspark.codecs.StringDecoder {}
+                    - !!com.dataspark.codecs.Field
+                        name: lat
+                        index: 15
+                        decoder: !!com.dataspark.codecs.StringDecoder {}
+                    - !!com.dataspark.codecs.Field
+                        name: lng
+                        index: 14
+                        decoder: !!com.dataspark.codecs.StringDecoder {}
+                    - !!com.dataspark.codecs.Field
+                        name: ci
+                        index: 5
+                        decoder: !!com.dataspark.codecs.StringDecoder {}
+                    - !!com.dataspark.codecs.Field
+                        name: cgi
+                        index: 18
+                        decoder: !!com.dataspark.codecs.StringDecoder {}
+
+job:
+    !!com.dataspark.jobs.composite.RDDPipelineJob
+        pipeline:
+            # decode source data line by line
+            - !!com.dataspark.jobs.transformations.ValueDecodingJob
+                decoder: !!com.dataspark.codecs.DelimitedRecordStringDecoder
+                    delimiter: ','
+                    inner: !!com.dataspark.codecs.MapDecoder
+                        fields:
+                            - !!com.dataspark.codecs.Field
+                                name: trans_year
+                                index: 0
+                                decoder: !!com.dataspark.codecs.StringDecoder
+                                    nullable: true
+                                    trim: true
+                                                                        
+                            - !!com.dataspark.codecs.Field
+                                name: trans_month
+                                index: 1
+                                decoder: !!com.dataspark.codecs.IntDecoder
+                                    nullable: true
+
+                            - !!com.dataspark.codecs.Field
+                                name: trans_day
+                                index: 2
+                                decoder: !!com.dataspark.codecs.IntDecoder
+                                    nullable: true
+                                                                        
+                            - !!com.dataspark.codecs.Field
+                                name: trans_hour
+                                index: 3
+                                decoder: !!com.dataspark.codecs.IntDecoder
+                                    nullable: true
+
+                            - !!com.dataspark.codecs.Field
+                                name: imsi
+                                index: 4
+                                decoder: !!com.dataspark.codecs.StringDecoder
+                                    nullable: true
+                                    trim: true
+
+                            - !!com.dataspark.codecs.Field
+                                name: mcc
+                                index: 8
+                                decoder: !!com.dataspark.codecs.StringDecoder
+                                    nullable: true
+                                    trim: true
+
+                            - !!com.dataspark.codecs.Field
+                                name: mnc
+                                index: 9
+                                decoder: !!com.dataspark.codecs.IntDecoder
+                                    nullable: true
+                                                        
+                            - !!com.dataspark.codecs.Field
+                                name: lac
+                                index: 10
+                                decoder: !!com.dataspark.codecs.IntDecoder
+                                    nullable: true
+
+                            - !!com.dataspark.codecs.Field
+                                name: ci
+                                index: 6
+                                decoder: !!com.dataspark.codecs.IntDecoder
+                                    nullable: true
+
+                            - !!com.dataspark.codecs.Field
+                                name: imei
+                                index: 5
+                                decoder: !!com.dataspark.codecs.StringDecoder
+                                    nullable: true
+                                    trim: true
+                                                                        
+            # filter for null imsi
+            - !!com.dataspark.jobs.transformations.FilterJob
+                inputFields: [imsi]
+                exp: (!imsi.equals("\\N") && imsi != null)
+
+            #transform and enrich some of the fields
+            - !!com.dataspark.jobs.transformations.ProcessingJob
+                enrichers:
+                    # Padding left zeros for LAC
+                    - !!com.dataspark.jobs.transformations.JavaExpression
+                        inputFields: [lac]
+                        outputField: lac_out
+                        exp: String.format("%05d", lac)
+                                        
+                    # Padding left zeros for CI
+                    - !!com.dataspark.jobs.transformations.JavaExpression
+                        inputFields: [ci]
+                        outputField: ci_out
+                        exp: String.format("%05d", ci)
+                     
+                    # Padding left zeros for Transaction Month
+                    - !!com.dataspark.jobs.transformations.JavaExpression
+                        inputFields: [trans_month]
+                        outputField: trans_month_out
+                        exp: String.format("%02d", trans_month)
+                    
+                    # Padding left zeros for Transaction Day
+                    - !!com.dataspark.jobs.transformations.JavaExpression
+                        inputFields: [trans_day]
+                        outputField: trans_day_out
+                        exp: String.format("%02d", trans_day)
+
+                    # Padding left zeros for Transaction Hour
+                    - !!com.dataspark.jobs.transformations.JavaExpression
+                        inputFields: [trans_hour]
+                        outputField: trans_hour_out
+                        exp: String.format("%02d", trans_hour)
+                    
+                    # Padding left zeros for MNC
+                    - !!com.dataspark.jobs.transformations.JavaExpression
+                        inputFields: [mnc]
+                        outputField: mnc
+                        exp: String.format("%02d", mnc)
+                        
+                    # consolidate date and time string
+                    - !!com.dataspark.jobs.transformations.FormattedStringEnricher
+                        inputFields: [trans_year, trans_month_out, trans_day_out, trans_hour_out]
+                        outputField: dt
+                        targetFormat: "%s-%s-%s %s:00:00"
+                                        
+                    # Rebuild CGI from cell values. Hardcode the MCC & MNC
+                    - !!com.dataspark.jobs.transformations.FormattedStringEnricher
+                        inputFields: [lac_out, ci_out]
+                        outputField: cgi
+                        targetFormat: "515-02-%s-%s"
+                                                        
+                    # map with cell mapping table
+                    - !!com.dataspark.jobs.transformations.SimpleMapLookup
+                        outputField: cell_mapping
+                        source: cell_mapping_table
+                        inputField: cgi
+
+                    # get lat from cell_mapping
+                    - !!com.dataspark.jobs.transformations.FormattedStringEnricher
+                        inputFields: [cell_mapping.lat]
+                        outputField: lat
+                        targetFormat: '%s'
+
+                    # get lng from cell_mapping
+                    - !!com.dataspark.jobs.transformations.FormattedStringEnricher
+                        inputFields: [cell_mapping.lng]
+                        outputField: lng
+                        targetFormat: '%s'
+
+                    # put "LDR" as event type
+                    - !!com.dataspark.jobs.transformations.Put
+                        values:
+                            event: "LDR"
+                            
+                    # put empty string as MSISDN
+                    - !!com.dataspark.jobs.transformations.Put
+                        values:
+                            msisdn: ""
+
+            # filter for invalid lat & lng
+            - !!com.dataspark.jobs.transformations.FilterJob
+                inputFields: [lat,lng]
+                exp: (lat != null && lng != null)
+                                
+            # encoding fields into a string for output writing
+            - !!com.dataspark.jobs.transformations.ValueEncodingJob
+                stopOnError: false
+                reportErrors: true
+                name: "job"
+                encoder: !!com.dataspark.codecs.MapEncoder
+                    fields:
+                        - !!com.dataspark.codecs.Field
+                            name: dt
+                            encoder: !!com.dataspark.codecs.StringEncoder {}
+
+                        - !!com.dataspark.codecs.Field
+                            name: imsi
+                            encoder: !!com.dataspark.codecs.StringEncoder {}
+
+                        - !!com.dataspark.codecs.Field
+                            name: msisdn
+                            encoder: !!com.dataspark.codecs.StringEncoder {}
+
+                        - !!com.dataspark.codecs.Field
+                            name: cgi
+                            encoder: !!com.dataspark.codecs.StringEncoder {}
+
+                        - !!com.dataspark.codecs.Field
+                            name: event
+                            encoder: !!com.dataspark.codecs.StringEncoder {}
+
+                        - !!com.dataspark.codecs.Field
+                            name: lat
+                            encoder: !!com.dataspark.codecs.StringEncoder {}
+
+                        - !!com.dataspark.codecs.Field
+                            name: lng
+                            encoder: !!com.dataspark.codecs.StringEncoder {}
+
+                        - !!com.dataspark.codecs.Field
+                            name: imei
+                            encoder: !!com.dataspark.codecs.StringEncoder {}
+
+                    inner: !!com.dataspark.codecs.DelimitedRecordStringEncoder
+                        delimiter: '|'
+
+            # put the data into desired number of partitions
+            - !!com.dataspark.jobs.transformations.RepartitionJob
+                partitions: 50
+                coalese: false
+
+            # write out to output path
+            - !!com.dataspark.jobs.outputs.TextFileOutputJob
+                uri: !arg output_path
+                consoleOutput: false

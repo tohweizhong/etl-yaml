@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "# etl_functions.R\n\n# every function has only two arguments: df and idx\n\n# function to drop column\ndrop_column <- function(df, idx){\n  df %>% subset(., select = -idx) %>% return\n}\n\n# use data.table syntax?\ntake_log <- function(df, idx){\n  df[,idx] <- log10(df[,idx])\n  return(df)\n}\n\n\n# functions:\n# scaling\n# changing datatype\n# category reordering for categorical variables\n# imputations\n# feature engineering\n",
+    "created" : 1494635201995.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "35534040",
+    "id" : "38E0D24C",
+    "lastKnownWriteTime" : 1494770235,
+    "last_content_update" : 1494770242061,
+    "path" : "C:/dev/etl-yaml/etl_functions.R",
+    "project_path" : "etl_functions.R",
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

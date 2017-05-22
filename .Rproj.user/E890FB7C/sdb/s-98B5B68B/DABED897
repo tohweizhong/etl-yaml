@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "\nlibrary(yaml)\nlibrary(magrittr)\n\nsource(\"etl_functions.R\")\n\n# load yaml file\nyml <- yaml.load_file(\"yaml/adult_etl.yaml\")\n\n# read data\ndf <- yml$arguments[[1]]$value %>% read.csv(., stringsAsFactors = FALSE)\n\n# get required transformations\nrequired_transformations <- lapply(yml$transformations, FUN = function(ele){\n  \n  hasIdx <- ele %>% unlist %>% length %>% `>`(., 1) %>% isTRUE\n  ifelse(hasIdx, return(ele), return())\n  \n}) %>% list.clean(., fun = is.null)\n\n# do the transformations\nlapply(required_transformations, FUN = function(ele){\n  df <<- ele$name %>% call(., df, ele$index) %>% eval\n  return(\".\")\n})\n\n# --------------------------------------------------------------------- #\n# Transformations that cannot be supported by the ETL process goes here #\n\n\n\n\n# --------------------------------------------------------------------- #\n\n# output\nwrite.table(x = df, file = yml$arguments[[3]]$value, row.names = FALSE)\n",
+    "created" : 1494598012140.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1069321579",
+    "id" : "DABED897",
+    "lastKnownWriteTime" : 1494638572,
+    "last_content_update" : 1494638572997,
+    "path" : "C:/dev/etl-yaml/test.R",
+    "project_path" : "test.R",
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
