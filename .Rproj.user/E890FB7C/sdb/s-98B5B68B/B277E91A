@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "# etl-yaml\nUsing YAML for ETL in R\n\nIdea is to simplify ETL process for deployment engineer by all required ETL procedures be fully defined in a YAML file.",
+    "created" : 1495441458065.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3982969170",
+    "id" : "B277E91A",
+    "lastKnownWriteTime" : 1495441630,
+    "last_content_update" : 1495441630188,
+    "path" : "C:/dev/etl-yaml/README.md",
+    "project_path" : "README.md",
+    "properties" : {
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "markdown"
+}
