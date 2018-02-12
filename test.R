@@ -1,6 +1,7 @@
 
 library(yaml)
 library(magrittr)
+library(rlist)
 
 source("etl_functions.R")
 
@@ -20,8 +21,10 @@ required_transformations <- lapply(yml$transformations, FUN = function(ele){
 
 # do the transformations
 lapply(required_transformations, FUN = function(ele){
+  
   df <<- ele$name %>% call(., df, ele$index) %>% eval
   return(".")
+  
 })
 
 # --------------------------------------------------------------------- #
